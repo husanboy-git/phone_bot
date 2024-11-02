@@ -20,6 +20,7 @@ public class CloudinaryService {
 
     public String uploadFile(File file) {
         try {
+            @SuppressWarnings("unchecked")
             Map<String, Object> uploadResult = cloudinary.uploader().upload(file, ObjectUtils.emptyMap());
             return (String) uploadResult.get("secure_url"); // 파일 URL 반환
         } catch (Exception e) {

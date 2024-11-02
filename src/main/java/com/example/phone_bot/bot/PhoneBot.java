@@ -286,48 +286,6 @@ public class PhoneBot extends TelegramLongPollingBot {
     }
 
 
-    private File downloadImage(String filePath) throws IOException, URISyntaxException {
-        String fileUrl = "https://api.telegram.org/file/bot" + token + "/" + filePath;
-        URI uri = new URI(fileUrl);
-        URL url = uri.toURL();
-
-        // 이미지를 다운로드
-        BufferedImage image = ImageIO.read(url);
-
-        // 일시적으로 저장할 경로를 설정합니다.
-        File tempFile = File.createTempFile("temp-", ".jpg");
-        ImageIO.write(image, "jpg", tempFile);
-
-        return tempFile;
-    }
-
-
-    private void handleEditPhoneCommand(Long chatId) {
-        Optional<PhoneEntity> latestPhone = phoneService.getLatestPhone(); // 가장 최근에 추가된 휴대폰 조회
-        if (latestPhone.isPresent()) {
-            phoneDataBuffer.put(chatId, latestPhone.get());
-            userState.put(chatId, "EDITING_BRAND");
-            sendMessage(chatId, "O'zgartirish uchun brend nomini kiriting:");
-        } else {
-            sendMessage(chatId, "O'zgartirish uchun telefon mavjud emas.");
-        }
-    }
-
-    private void handleDeletePhoneCommand(Long chatId) {
-        Optional<PhoneEntity> latestPhone = phoneService.getLatestPhone();  // 가장 최근에 추가된 휴대폰 조회
-        if (latestPhone.isPresent()) {
-            phoneService.deletePhone(latestPhone.get().getId());
-            sendMessage(chatId, "Telefon muvaffaqiyatli o'chirildi.");
-        } else {
-            sendMessage(chatId, "O'chirish uchun telefon mavjud emas.");
-        }
-        userState.remove(chatId);
-    }
-
-    private String getFilePath(String fileId) throws TelegramApiException {
-        return execute(new GetFile(fileId)).getFilePath();
-    }
-
     private File downloadAndCompressImage(String filePath) throws IOException, URISyntaxException {
         String fileUrl = "https://api.telegram.org/file/bot" + token + "/" + filePath;
         URI uri = new URI(fileUrl);
@@ -358,6 +316,32 @@ public class PhoneBot extends TelegramLongPollingBot {
         return compressedImageFile;
     }
 
+
+    private void handleEditPhoneCommand(Long chatId) {
+        Optional<PhoneEntity> latestPhone = phoneService.getLatestPhone(); // 가장 최근에 추가된 휴대폰 조회
+        if (latestPhone.isPresent()) {
+            phoneDataBuffer.put(chatId, latestPhone.get());
+            userState.put(chatId, "EDITING_BRAND");
+            sendMessage(chatId, "O'zgartirish uchun brend nomini kiriting:");
+        } else {
+            sendMessage(chatId, "O'zgartirish uchun telefon mavjud emas.");
+        }
+    }
+
+    private void handleDeletePhoneCommand(Long chatId) {
+        Optional<PhoneEntity> latestPhone = phoneService.getLatestPhone();  // 가장 최근에 추가된 휴대폰 조회
+        if (latestPhone.isPresent()) {
+            phoneService.deletePhone(latestPhone.get().getId());
+            sendMessage(chatId, "Telefon muvaffaqiyatli o'chirildi.");
+        } else {
+            sendMessage(chatId, "O'chirish uchun telefon mavjud emas.");
+        }
+        userState.remove(chatId);
+    }
+
+    private String getFilePath(String fileId) throws TelegramApiException {
+        return execute(new GetFile(fileId)).getFilePath();
+    }
 
     // add admin method
     private void handleAddAdminCommand(Long chatId) {
@@ -445,35 +429,27 @@ public class PhoneBot extends TelegramLongPollingBot {
     private void sendPhoto(Long chatId, String imagePath, String caption) {
         SendPhoto sendPhotoRequest = new SendPhoto();
         sendPhotoRequest.setChatId(chatId.toString());
-        sendPhotoRequest.setPhoto(new InputFile(new File(imagePath)));
+
+        try {
+            // URL로부터 InputStream 생성하여 전송
+            URL url = new URL(imagePath);
+            sendPhotoRequest.setPhoto(new InputFile(url.openStream(), "image.jpg"));
+        } catch (IOException e) {
+            e.printStackTrace();
+            sendMessage(chatId, "이미지를 불러오는 데 실패했습니다.");
+            return;
+        }
+
         sendPhotoRequest.setCaption(caption);
 
-        SendMessage message = new SendMessage();
-        message.setChatId(chatId);
+        // 사용자 권한에 따라 버튼 설정
+        Optional<UserDto> user = userService.getUserByTelegramId(chatId);
+        boolean isAdmin = user.isPresent() && user.get().role() == Role.ADMIN;
 
         InlineKeyboardMarkup inlineKeyboardMarkup = new InlineKeyboardMarkup();
         List<List<InlineKeyboardButton>> keyboard = new ArrayList<>();
 
-        InlineKeyboardButton orderButton = new InlineKeyboardButton();
-        orderButton.setText("🛒  Buyurtma berish  🛒");
-        orderButton.setCallbackData("order_phone_");
-
-        List<InlineKeyboardButton> row = new ArrayList<>();
-        row.add(orderButton);
-        keyboard.add(row);
-
-        inlineKeyboardMarkup.setKeyboard(keyboard);
-        sendPhotoRequest.setReplyMarkup(inlineKeyboardMarkup);
-
-        // 현재 사용자 권한 확인
-        Optional<UserDto> user = userService.getUserByTelegramId(chatId);
-        boolean isAdmin = user.isPresent() && user.get().role() == Role.ADMIN;
-
         if (isAdmin) {
-            // 관리자에게만 수정 및 삭제 버튼 추가
-            InlineKeyboardMarkup inlineKeyboard = new InlineKeyboardMarkup();
-            List<List<InlineKeyboardButton>> rowsInline = new ArrayList<>();
-
             InlineKeyboardButton editButton = new InlineKeyboardButton();
             editButton.setText("O'zgartirish");
             editButton.setCallbackData("edit_phone");
@@ -482,19 +458,26 @@ public class PhoneBot extends TelegramLongPollingBot {
             deleteButton.setText("O'chirish");
             deleteButton.setCallbackData("delete_phone");
 
-            List<InlineKeyboardButton> rowInline = Arrays.asList(editButton, deleteButton);
-            rowsInline.add(rowInline);
-
-            inlineKeyboard.setKeyboard(rowsInline);
-            sendPhotoRequest.setReplyMarkup(inlineKeyboard);
+            List<InlineKeyboardButton> adminButtons = Arrays.asList(editButton, deleteButton);
+            keyboard.add(adminButtons);
+        } else {
+            InlineKeyboardButton orderButton = new InlineKeyboardButton();
+            orderButton.setText("🛒 Buyurtma berish 🛒");
+            orderButton.setCallbackData("order_phone_");
+            keyboard.add(Collections.singletonList(orderButton));
         }
+
+        inlineKeyboardMarkup.setKeyboard(keyboard);
+        sendPhotoRequest.setReplyMarkup(inlineKeyboardMarkup);
 
         try {
-            execute(sendPhotoRequest);  // 사진 전송
+            execute(sendPhotoRequest); // 사진 전송
         } catch (TelegramApiException e) {
             e.printStackTrace();
+            sendMessage(chatId, "이미지를 전송하는 중 오류가 발생했습니다.");
         }
     }
+
 
     private void showMenuButtons(Long chatId) {
         SendMessage message = new SendMessage();
