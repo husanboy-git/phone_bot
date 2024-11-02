@@ -4,6 +4,7 @@ import com.example.phone_bot.model.Role;
 import com.example.phone_bot.model.dto.PhoneDto;
 import com.example.phone_bot.model.dto.UserDto;
 import com.example.phone_bot.model.entity.PhoneEntity;
+import com.example.phone_bot.service.CloudinaryService;
 import com.example.phone_bot.service.PhoneService;
 import com.example.phone_bot.service.UserService;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -40,6 +41,7 @@ import java.util.*;
 public class PhoneBot extends TelegramLongPollingBot {
     @Autowired private UserService userService;
     @Autowired private PhoneService phoneService;
+    @Autowired private CloudinaryService cloudinaryService;
 
     @Value("${admin.password}")
     private String adminPassword;
@@ -259,16 +261,20 @@ public class PhoneBot extends TelegramLongPollingBot {
                 String filePath = getFilePath(fileId);
                 File imageFile = downloadAndCompressImage(filePath);
 
+                // Cloudinary에 이미지 업로드
+                String imageUrl = cloudinaryService.uploadFile(imageFile); // Cloudinary에서 URL 가져오기
+
                 PhoneEntity phoneEntity = phoneDataBuffer.get(chatId);
 
                 if (ADDING_PHOTO.equals(state)) {
-                    phoneService.addPhone(PhoneDto.toDto(phoneEntity), imageFile);
+                    phoneService.addPhone(PhoneDto.toDto(phoneEntity), imageUrl); // URL을 사용하여 전화 추가
                     sendMessage(chatId, "Yangi telefon muvaffaqiyatli qo'shildi!");
                 } else {
-                    phoneService.updatePhone(phoneEntity.getId(), PhoneDto.toDto(phoneEntity), imageFile);
+                    phoneService.updatePhone(phoneEntity.getId(), PhoneDto.toDto(phoneEntity), imageUrl); // URL을 사용하여 전화 업데이트
                     sendMessage(chatId, "Telefon ma'lumotlari muvaffaqiyatli o'zgartirildi!");
                 }
 
+                // 데이터 버퍼에서 전화 데이터 제거
                 phoneDataBuffer.remove(chatId);
                 userState.remove(chatId);
 
@@ -278,6 +284,23 @@ public class PhoneBot extends TelegramLongPollingBot {
             }
         }
     }
+
+
+    private File downloadImage(String filePath) throws IOException, URISyntaxException {
+        String fileUrl = "https://api.telegram.org/file/bot" + token + "/" + filePath;
+        URI uri = new URI(fileUrl);
+        URL url = uri.toURL();
+
+        // 이미지를 다운로드
+        BufferedImage image = ImageIO.read(url);
+
+        // 일시적으로 저장할 경로를 설정합니다.
+        File tempFile = File.createTempFile("temp-", ".jpg");
+        ImageIO.write(image, "jpg", tempFile);
+
+        return tempFile;
+    }
+
 
     private void handleEditPhoneCommand(Long chatId) {
         Optional<PhoneEntity> latestPhone = phoneService.getLatestPhone(); // 가장 최근에 추가된 휴대폰 조회
@@ -313,14 +336,8 @@ public class PhoneBot extends TelegramLongPollingBot {
         // 이미지를 다운로드
         BufferedImage image = ImageIO.read(url);
 
-        // 저장 경로를 D 드라이브로 설정
-        File imagesDir = new File("D:/images");
-        if (!imagesDir.exists()) {
-            imagesDir.mkdirs();
-        }
-
         // 파일 이름 설정
-        File compressedImageFile = new File(imagesDir, UUID.randomUUID() + ".jpg");
+        File compressedImageFile = new File(UUID.randomUUID() + ".jpg");
 
         // 압축 품질 설정 (0.0 ~ 1.0, 1.0이 최고 품질)
         try (FileOutputStream fos = new FileOutputStream(compressedImageFile);
@@ -340,6 +357,7 @@ public class PhoneBot extends TelegramLongPollingBot {
 
         return compressedImageFile;
     }
+
 
     // add admin method
     private void handleAddAdminCommand(Long chatId) {

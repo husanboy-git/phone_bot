@@ -29,51 +29,34 @@ public class PhoneService {
     }
 
     @Transactional
-    public PhoneDto addPhone(PhoneDto phoneDto, File imageFile) throws IOException {
-        if (!ImageUtils.isValidImageFile(imageFile)) {
-            throw new IllegalArgumentException("Invalid image file.");
-        }
+    public PhoneDto addPhone(PhoneDto phoneDto, String imageUrl) throws IOException {
+        // URL에서 이미지를 다운로드하여 저장할 필요가 없다면, 아래 코드는 생략할 수 있습니다.
+        // 만약 필요하다면, URL에서 이미지를 다운로드하고 저장하는 로직을 추가해야 합니다.
 
-        String imagePath = "images/" + phoneDto.model() + "_" + System.currentTimeMillis() + ".png";
-        File destinationFile = new File(imagePath);
-
-        try (FileOutputStream fos = new FileOutputStream(destinationFile)) {
-            fos.write(Files.readAllBytes(imageFile.toPath()));
-        }
-
-        // PhoneEntity를 생성하고 이미지 경로 설정
+        // PhoneEntity를 생성하고 이미지 URL 설정
         PhoneEntity entity = PhoneEntity.of(
                 phoneDto.brand(),
                 phoneDto.model(),
                 phoneDto.price(),
                 phoneDto.imagePath(),
                 phoneDto.condition());
-        entity.setImage(imagePath); // 이미지 경로 설정 추가
+        entity.setImage(imageUrl); // 이미지 URL 설정 추가
         PhoneEntity savedEntity = phoneRepository.save(entity);
         return PhoneDto.toDto(savedEntity);
     }
 
 
 
+
     @Transactional
-    public PhoneDto updatePhone(Long id, PhoneDto phoneDto, File imageFile) throws IOException {
-        if (!ImageUtils.isValidImageFile(imageFile)) {
-            throw new IllegalArgumentException("Invalid image file.");
-        }
-
-        String imagePath = "images/" + phoneDto.model() + "_" + System.currentTimeMillis() + ".png";
-        File destinationFile = new File(imagePath);
-
-        try (FileOutputStream fos = new FileOutputStream(destinationFile)) {
-            fos.write(Files.readAllBytes(imageFile.toPath()));
-        }
+    public PhoneDto updatePhone(Long id, PhoneDto phoneDto, String imageFile) throws IOException {
 
         PhoneEntity entity = phoneRepository.findById(id)
                 .orElseThrow(() -> new IllegalArgumentException("Phone not found"));
         entity.setBrand(phoneDto.brand());
         entity.setModel(phoneDto.model());
         entity.setPrice(phoneDto.price());
-        entity.setImage(imagePath);
+        entity.setImage(imageFile);
         entity.setCondition(phoneDto.condition());
         phoneRepository.save(entity);
         return PhoneDto.toDto(entity);

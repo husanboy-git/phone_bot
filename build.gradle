@@ -35,6 +35,8 @@ dependencies {
 	implementation 'org.telegram:telegrambots-spring-boot-starter:6.1.0'
 	implementation 'javax.xml.bind:jaxb-api:2.3.1'
 	implementation 'org.glassfish.jaxb:jaxb-runtime:2.3.1'
+
+	implementation 'com.cloudinary:cloudinary-http44:1.31.0'
 }
 
 tasks.named('test') {
