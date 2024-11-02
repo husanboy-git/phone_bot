@@ -383,17 +383,27 @@ public class PhoneBot extends TelegramLongPollingBot {
         InlineKeyboardMarkup inlineKeyboard = new InlineKeyboardMarkup();
         List<List<InlineKeyboardButton>> rowsInline = new ArrayList<>();
         Set<String> addedModels = new HashSet<>();  // 중복 모델 체크를 위한 Set
+        List<InlineKeyboardButton> currentRow = new ArrayList<>(); // 현재 행의 버튼들
 
         for (PhoneDto phone : phones) {
             if (!addedModels.contains(phone.model())) {  // 이미 추가된 모델은 건너뜀
-                List<InlineKeyboardButton> rowInline = new ArrayList<>();
                 InlineKeyboardButton button = new InlineKeyboardButton();
                 button.setText(phone.model());  // 모델명을 버튼 텍스트로 사용
                 button.setCallbackData(phone.model());  // 모델명을 콜백 데이터로 사용
-                rowInline.add(button);
-                rowsInline.add(rowInline);
+                currentRow.add(button);  // 현재 행에 버튼 추가
+
+                // 버튼이 2개가 추가될 때마다 새로운 행을 생성
+                if (currentRow.size() == 2) {
+                    rowsInline.add(currentRow);
+                    currentRow = new ArrayList<>(); // 다음 행을 위해 새 리스트 생성
+                }
                 addedModels.add(phone.model());  // 모델 추가됨을 기록
             }
+        }
+
+        // 마지막에 남아있는 버튼들을 행에 추가
+        if (!currentRow.isEmpty()) {
+            rowsInline.add(currentRow);
         }
 
         inlineKeyboard.setKeyboard(rowsInline);
@@ -405,6 +415,7 @@ public class PhoneBot extends TelegramLongPollingBot {
             e.printStackTrace();
         }
     }
+
 
     private void handleModelSelection(Long chatId, String model) {
         List<PhoneDto> phones = phoneService.getPhonesByModel(model);  // 모델에 해당하는 모든 폰을 조회
@@ -436,7 +447,7 @@ public class PhoneBot extends TelegramLongPollingBot {
             sendPhotoRequest.setPhoto(new InputFile(url.openStream(), "image.jpg"));
         } catch (IOException e) {
             e.printStackTrace();
-            sendMessage(chatId, "이미지를 불러오는 데 실패했습니다.");
+            sendMessage(chatId, " "); //이미지를 불러오는 데 실패했습니다
             return;
         }
 
