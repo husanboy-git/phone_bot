@@ -78,7 +78,4 @@ public class PhoneService {
         PhoneEntity phoneEntity = phoneRepository.findById(id).orElseThrow(() -> new IllegalArgumentException("phone is not found!"));
         return Optional.of(PhoneDto.toDto(phoneEntity));
     }
-
-    public void updatePhone(PhoneEntity phoneToUpdate, File validImageFile) {
-    }
 }

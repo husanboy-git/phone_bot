@@ -22,15 +22,6 @@ WORKDIR /app
 # 빌드된 JAR 파일 복사
 COPY --from=build /app/build/libs/*.jar app.jar
 
-# 환경 변수 설정
-ENV MYSQLDATABASE=railway
-ENV MYSQLHOST=mysql.railway.internal
-ENV MYSQLPORT=3306
-ENV MYSQLUSER=root
-ENV MYSQLPASSWORD=teAFSLvxGQxVVKljSibRKScjxphPbxFR
-ENV TELEGRAM_BOT_TOKEN=8163853097:AAGpjtmupYG4rjeCNcV5xq5z4e2ltTCBKeU
-ENV ADMIN_PASSWORD=Java2023
-
 # Health Check (애플리케이션의 상태를 확인하는 URL로 변경 가능)
 HEALTHCHECK CMD curl --fail http://localhost:8080/actuator/health || exit 1
 
